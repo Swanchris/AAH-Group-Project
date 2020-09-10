@@ -1,9 +1,12 @@
+### I've added my comments with triple # ~ Chris
+
 # This is just something to start with. If there's anything you wish to change, feel free to do so.
 # If there's anything that needs clarifying please indicate it as a comment with #### prefixed.
 
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+
 
 # note: instances should be read from text file instead of as defined below
 
@@ -13,6 +16,27 @@ p = np.append(p, 1 + np.random.randint(3001, size = 71))
 p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 100, p = 0.5, size = 100))
 m = 243 # number of machines
 
+### creating an example txt instance
+inst = np.append(p,m)
+with open("instance.txt", "w") as f:
+    print(inst, file = f)
+    
+### Given an instance will be of the form (𝑝1,𝑝2,⋯,𝑝𝑛,𝑚) we need to read the txt file in this way. We can then chop it up for the agent to manipulate
+
+def import_inst(filename):
+    '''
+    imports a text file instance, converts it to an array and then allocates it to p and m, 
+    where p are the jobs and m is the number of machines
+    '''
+    lst = [line.rstrip('\n') for line in open(filename)]
+    inst = []
+    for j in range(0,len(lst)):
+        inst = np.append(inst,[int(i) for i in str.split(lst[j])])
+    global p, m
+    m =  int(inst[-1])
+    p = inst[:-1].astype(np.int)
+
+
 # makespan instance from Charl's lecture notes (part 3)
 # allowableTime = 1
 # m = 4
@@ -21,7 +45,8 @@ m = 243 # number of machines
 # this defines an 'agent' object which would implement a heuristic to solve the makespan problem
 # note: for neatness, this should later be moved to its own file
 class agent:
-    def __init__(self):
+    def __init__(self): 
+        ### Does this need to be __init__(self, machine, workload) ? Or do we only want self because different methods take different attributes ?
         self.machine = [] # list of length len(p), where self.machine[job] = machine assigned to job
         self.workload = np.array([]) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
@@ -31,7 +56,8 @@ class agent:
         self.machine = []
         self.workload = np.zeros(m)
         for job in range(len(p)):
-            machine = np.random.randint(m) # randomly select machine to assign job to
+            machine = np.random.randint(m) # randomly select machine to assign job to 
+            ### should we have different variable name given that 'machine' is already an attribute ?
             self.machine.append(machine) # assign 'job' to 'machine'
             self.workload[machine] += p[job] # add job processing time to workload of 'machine'
         self.cost = np.max(self.workload)
