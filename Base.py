@@ -6,15 +6,16 @@
 import numpy as np
 import time
 import matplotlib.pyplot as plt
+import random
 
 
 # note: instances should be read from text file instead of as defined below
 
-allowableTime = 3 # time allowed in seconds
-p = 1 + np.random.randint(1000, size = 410) # job processing times
-p = np.append(p, 1 + np.random.randint(3001, size = 71))
-p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 100, p = 0.5, size = 100))
-m = 243 # number of machines
+allowableTime = 2 # time allowed in seconds
+p = 1 + np.random.randint(1000, size = 612) # job processing times
+p = np.append(p, 1 + np.random.randint(2001, size = 132))
+p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 1500, p = 0.5, size = 201))
+m = 201 # number of machines
 
 ### creating an example txt instance
 inst = np.append(p,m)
@@ -61,37 +62,27 @@ class agent:
             self.machine.append(machine) # assign 'job' to 'machine'
             self.workload[machine] += p[job] # add job processing time to workload of 'machine'
         self.cost = np.max(self.workload)
-    # when the workload of a machine is to be changed, add 'update' to the workload and efficiently update self.cost 
-    def updateWorkload(self, machine, update):
-        initialWorkload = self.workload[machine]
-        newWorkload = initialWorkload + update
-        self.workload[machine] = newWorkload
-        if newWorkload > self.cost:
-            self.cost = newWorkload
-        elif initialWorkload == self.cost and newWorkload < self.cost:
-            self.cost = np.max(self.workload)
-        else:
-            pass
     # switch assigned machine of 'job' to 'toMachine'
     def switchMachine(self, job, toMachine):
-        fromMachine = self.machine[job] # initial machine of job
-        self.updateWorkload(fromMachine, -p[job])
+        self.workload[self.machine[job]] += -p[job]
         self.machine[job] = toMachine
-        self.updateWorkload(toMachine, p[job])
+        self.workload[toMachine] += p[job]
     # Note that this is just a (random) local search implementation, not greedy local search as question 1 asks
     def localSearchIteration(self, k):
         costAlpha = self.cost
-        jobs, machines = np.random.choice(len(p), size = k), np.random.choice(m, size = k) # randomly select jobs and machines to assign these jobs to
+        jobs = [int(len(p)*random.random()) for i in range(k)] # randomly choose k jobs to reassign
+        machines = [int(m*random.random()) for i in range(k)] # randomly choose k machines to assign these jobs to
         initialMachines = [self.machine[i] for i in jobs]
         for (job, machine) in zip(jobs, machines):
             self.switchMachine(job, machine)
-        costBeta = self.cost
+        costBeta = self.workload[np.argmax(self.workload)] # find max workload across machines, faster than np.max(self.workload) 
         # if new feasible solution is worse then go back, otherwise stay
         if costBeta > costAlpha:
             for (job, machine) in zip(jobs, initialMachines):
                 self.switchMachine(job, machine)
             self.costTrajectory.append(costAlpha)
         else:
+            self.cost = costBeta
             self.costTrajectory.append(costBeta)
     # k defines the size of the neighbourhood and totalTime determines how much time the function is allowed to run
     def localSearch(self, k, totalTime):
@@ -107,6 +98,7 @@ A.localSearch(4, allowableTime)
 plt.plot(A.costTrajectory)
 plt.xlabel("iteration")
 plt.ylabel("cost of feasible solution")
+plt.axhline(y = max(sum(p)/m, np.max(p)), color = "gold") # lower bound for global minimum
 
 # determines whether the solution found by A is indeed feasible, input: A is an 'agent' object
 def verifyFeasibleSolution(A):
