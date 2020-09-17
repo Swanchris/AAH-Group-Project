@@ -16,9 +16,10 @@ p = 1 + np.random.randint(1000, size = 612) # job processing times
 p = np.append(p, 1 + np.random.randint(2001, size = 132))
 p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 1500, p = 0.5, size = 201))
 m = 201 # number of machines
+inst = np.append(p,m)
 
 ### creating an example txt instance
-inst = np.append(p,m)
+
 with open("instance.txt", "w") as f:
     print(inst, file = f)
     
@@ -29,13 +30,11 @@ def import_inst(filename):
     imports a text file instance, converts it to an array and then allocates it to p and m, 
     where p are the jobs and m is the number of machines
     '''
-    lst = [line.rstrip('\n') for line in open(filename)]
-    inst = []
-    for j in range(0,len(lst)):
-        inst = np.append(inst,[int(i) for i in str.split(lst[j])])
+    inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
     global p, m
     m =  int(inst[-1])
-    p = inst[:-1].astype(np.int)
+    p = inst[:-1]
+### - FIXED. This will now work for gibberish inputs of any alphabet
 
 
 # makespan instance from Charl's lecture notes (part 3)
