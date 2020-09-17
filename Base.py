@@ -16,7 +16,7 @@ p = 1 + np.random.randint(1000, size = 612) # job processing times
 p = np.append(p, 1 + np.random.randint(2001, size = 132))
 p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 1500, p = 0.5, size = 201))
 m = 201 # number of machines
-inst = np.append(p,m)
+inst = np.append(allowableTime,np.append(m,p))
 
 ### creating an example txt instance
 
@@ -32,8 +32,9 @@ def import_inst(filename):
     '''
     inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
     global p, m
-    m =  int(inst[-1])
-    p = inst[:-1]
+    m =  int(inst[2:])
+    p = inst[1]
+    allowableTime = inst[0]
 ### - FIXED. This will now work for gibberish inputs of any alphabet
 
 
