@@ -31,7 +31,7 @@ def import_inst(filename):
     where p are the jobs and m is the number of machines
     '''
     inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
-    global p, m
+    global p, m, allowableTime
     m =  int(inst[2:])
     p = inst[1]
     allowableTime = inst[0]
