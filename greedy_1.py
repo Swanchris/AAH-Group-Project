@@ -40,6 +40,7 @@ def import_inst(filename):
 # note: for neatness, this should later be moved to its own file
 class agent:
     def __init__(self): 
+        self.initialTime = time.time()
         self.allocation = {x: [] for x in range(m)} ### A dictionary where we can keep track of which job is assigned to which machine ie: allocation[0] = [k_1, ...] are the jobs assigned to the first machine
         self.workload = np.array([]) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
@@ -57,7 +58,7 @@ class agent:
             self.allocation[worker].append(p[i])
             self.workload[worker] += p[i]
         self.cost = np.max(self.workload)
-        print(self.workload)
+        self.costTrajectory.append(self.cost)
         
     # switch assigned machine of 'job' to 'toMachine'
     def switchMachine(self,  job, fromMachine, toMachine):
@@ -65,30 +66,31 @@ class agent:
         self.allocation[fromMachine].remove(job)
         self.workload[toMachine] += job
         self.allocation[toMachine].append(job)
+    
+    def Swap(self, Big, big_candidate, Small, small_candidate):
+        self.switchMachine(Big, big_candidate, small_candidate)
+        self.switchMachine(Small, small_candidate, big_candidate)
+    
+    def greedySearchIteration(self):
+        big_candidate = np.argmax(self.workload)
+        small_candidate = np.argmin(self.workload)
+        Big = np.max(self.allocation[big_candidate])
+        Small = np.min(self.allocation[small_candidate])
+        self.Swap(Big, big_candidate, Small, small_candidate)
+        self.cost = np.max(self.workload)
+        self.costTrajectory.append(self.cost)
+        print(self.cost)
+    
+    def greedySearch(self,totalTime):
+        self.generateGreedySolution()
+        while time.time() - self.initialTime < totalTime:
+            self.greedySearchIteration()
+            if self.costTrajectory[-1] <= self.costTrajectory[-2]:
+                return print(self.costTrajectory[-2])
+            
+    
             
     
 
     ### the switch machine function will work fine for the greedy search
 ### Greedy makespan algo is on pg 262 of text
-        
-A = agent()
-
-
-# determines whether the solution found by A is indeed feasible, input: A is an 'agent' object
-def verifyFeasibleSolution(A):
-    # check that each job is assigned to exactly one machine
-    assert(len(A.machine) == len(p))
-    # check that there are at most m machines that have jobs assigned to them
-    assert(max(A.machine) <= m)
-
-    # check that the workloads are as indicated in A.workload
-    workload = np.zeros(m)
-    for job in range(len(p)):
-        workload[A.machine[job]] += p[job]
-    for i in range(m):
-        assert(workload[i] == A.workload[i])
-
-    # check that the maximum of the workloads (i.e. the cost) is as indicated in A.cost
-    assert(np.isclose(A.cost, np.max(A.workload)))
-
-verifyFeasibleSolution(A)
