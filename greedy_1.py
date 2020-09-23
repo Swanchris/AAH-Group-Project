@@ -35,89 +35,44 @@ def import_inst(filename):
     m =  int(inst[2:])
     p = inst[1]
     allowableTime = inst[0]
-### - FIXED. This will now work for gibberish inputs of any alphabet
-
-
-# makespan instance from Charl's lecture notes (part 3)
-# allowableTime = 1
-# m = 4
-# p = [3, 2, 4, 1, 3, 3, 6]
 
 # this defines an 'agent' object which would implement a heuristic to solve the makespan problem
 # note: for neatness, this should later be moved to its own file
 class agent:
     def __init__(self): 
-        ### Does this need to be __init__(self, machine, workload) ? Or do we only want self because different methods take different attributes ?
-        self.machine = [] # list of length len(p), where self.machine[job] = machine assigned to job
+        self.allocation = {x: [] for x in range(m)} ### A dictionary where we can keep track of which job is assigned to which machine ie: allocation[0] = [k_1, ...] are the jobs assigned to the first machine
         self.workload = np.array([]) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
-    # generates a random initial feasible solution
-    def generateInitialSolution(self):
-        self.machine = []
-        self.workload = np.zeros(m)
-        for job in range(len(p)):
-            machine = np.random.randint(m) # randomly select machine to assign job to 
-            ### should we have different variable name given that 'machine' is already an attribute ? suggest "worker"
-            self.machine.append(machine) # assign 'job' to 'machine'
-            self.workload[machine] += p[job] # add job processing time to workload of 'machine'
-        self.cost = np.max(self.workload)
-    # switch assigned machine of 'job' to 'toMachine'
-    def switchMachine(self, job, toMachine):
-        self.workload[self.machine[job]] += -p[job]
-        self.machine[job] = toMachine
-        self.workload[toMachine] += p[job]
-    # Note that this is just a (random) local search implementation, not greedy local search as question 1 asks
-    def localSearchIteration(self, k):
-        costAlpha = self.cost
-        jobs = [int(len(p)*random.random()) for i in range(k)] # randomly choose k jobs to reassign
-        machines = [int(m*random.random()) for i in range(k)] # randomly choose k machines to assign these jobs to
-        initialMachines = [self.machine[i] for i in jobs]
-        for (job, machine) in zip(jobs, machines):
-            self.switchMachine(job, machine)
-        costBeta = self.workload[np.argmax(self.workload)] # find max workload across machines, faster than np.max(self.workload) 
-        # if new feasible solution is worse then go back, otherwise stay
-        if costBeta > costAlpha:
-            for (job, machine) in zip(jobs, initialMachines):
-                self.switchMachine(job, machine)
-            self.costTrajectory.append(costAlpha)
-        else:
-            self.cost = costBeta
-            self.costTrajectory.append(costBeta)
-    # k defines the size of the neighbourhood and totalTime determines how much time the function is allowed to run
-    def localSearch(self, k, totalTime):
-        initialTime = time.time()
-        # note: algorithm may run later than cut-off if iteration takes too long!
-        while time.time() - initialTime < totalTime:
-            self.localSearchIteration(k)
-    
-    ### we'll begin with a rigid definition of neighbour, where a neighbour is "machine +/- 1 mod len(m)"
-    ### we'll construct it in a similar fashion to our random local search
+        
+    # generates a greedy initial feasible solution
     def generateGreedySolution(self):
         ### couple of different ideas about how to sort this array - 
         ### see "https://stackoverflow.com/questions/26984414/efficiently-sorting-a-numpy-array-in-descending-order"
         ### to begin with, i'll go with an inplace sorting, but whether this is efficent we'll discuss later
-        self.machine = []
         self.workload = np.zeros(m)
         p[::-1].sort()
         for i in range(len(p)):
             worker = np.argmin(self.workload)
-            self.machine.append(worker)
+            self.allocation[worker].append(p[i])
             self.workload[worker] += p[i]
         self.cost = np.max(self.workload)
         print(self.workload)
+        
+    # switch assigned machine of 'job' to 'toMachine'
+    def switchMachine(self,  job, fromMachine, toMachine):
+        self.workload[fromMachine] += - job
+        self.allocation[fromMachine].remove(job)
+        self.workload[toMachine] += job
+        self.allocation[toMachine].append(job)
+            
+    
 
     ### the switch machine function will work fine for the greedy search
-    
+### Greedy makespan algo is on pg 262 of text
         
 A = agent()
-A.generateInitialSolution()
-A.localSearch(4, allowableTime)
 
-plt.plot(A.costTrajectory)
-plt.xlabel("iteration")
-plt.ylabel("cost of feasible solution")
-plt.axhline(y = max(sum(p)/m, np.max(p)), color = "gold") # lower bound for global minimum
 
 # determines whether the solution found by A is indeed feasible, input: A is an 'agent' object
 def verifyFeasibleSolution(A):
