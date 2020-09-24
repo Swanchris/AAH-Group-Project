@@ -7,6 +7,8 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 import random
+import re
+from itertools import compress
 
 
 # note: instances should be read from text file instead of as defined below
@@ -32,11 +34,11 @@ def import_inst(filename):
     '''
     inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
     global p, m, allowableTime
-    m =  int(inst[2:])
-    p = inst[1]
+    p =  inst[2:]
+    m = inst[1]
     allowableTime = inst[0]
-### - FIXED. This will now work for gibberish inputs of any alphabet
 
+import_inst("instance.txt")
 
 # makespan instance from Charl's lecture notes (part 3)
 # allowableTime = 1
