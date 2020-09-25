@@ -1,8 +1,3 @@
-### I've added my comments with triple # ~ Chris
-
-# This is just something to start with. If there's anything you wish to change, feel free to do so.
-# If there's anything that needs clarifying please indicate it as a comment with #### prefixed.
-
 import numpy as np
 import time
 import matplotlib.pyplot as plt
@@ -10,8 +5,6 @@ import random
 import re
 from itertools import compress
 
-
-# note: instances should be read from text file instead of as defined below
 
 allowableTime = 2 # time allowed in seconds
 p = 1 + np.random.randint(1000, size = 612) # job processing times
@@ -40,6 +33,7 @@ def import_inst(filename):
 
 import_inst("instance.txt")
 
+
 # this defines an 'agent' object which would implement a heuristic to solve the makespan problem
 # note: for neatness, this should later be moved to its own file
 class agent:
@@ -49,8 +43,8 @@ class agent:
         self.workload = np.zeros(m) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
-        self.temp_allocation = None
-        self.temp_workload = None
+        self.big_candidate = None
+        self.small_candidate = None
         
     # generates a greedy initial feasible solution
     def generateGreedySolution(self):
@@ -65,61 +59,72 @@ class agent:
             self.workload[worker] += p[i]
         self.cost = np.max(self.workload)
         self.costTrajectory.append(self.cost)
-        self.temp_workload = self.workload
-        self.temp_allocation = self.allocation
+        
         
     # switch assigned machine of 'job' to 'toMachine'
     def switchMachine(self,  job, fromMachine, toMachine):
-        self.temp_workload[fromMachine] += - job
-        self.temp_allocation[fromMachine].remove(job)
-        self.temp_workload[toMachine] += job
-        self.temp_allocation[toMachine].append(job)
+        self.workload[fromMachine] += - job
+        self.allocation[fromMachine].remove(job)
+        self.workload[toMachine] += job
+        self.allocation[toMachine].append(job)
     
     def Swap(self, Big, big_candidate, Small, small_candidate):
         self.switchMachine(Big, big_candidate, small_candidate)
         self.switchMachine(Small, small_candidate, big_candidate)
     
     def greedySearchIteration(self):
-        big_candidate = np.argmax(self.temp_workload)
-        small_candidate = np.argmin(self.temp_workload)
-        Big = np.max(self.temp_allocation[big_candidate])
-        Small = np.max(list(compress(self.temp_allocation[small_candidate],[i < Big for i in self.temp_allocation[small_candidate]])))
-        self.Swap(Big, big_candidate, Small, small_candidate)
-        if np.max(self.temp_workload) <= self.cost:
-            self.cost = np.max(self.temp_workload)
-            self.costTrajectory.append(self.cost)
-            print(self.cost)
+        self.big_candidate = np.argmax(self.workload)
+        self.small_candidate = np.argmin(self.workload)
+        Big = np.max(self.allocation[self.big_candidate])
+        Small = np.max(list(compress(self.allocation[self.small_candidate],
+                                     [i < Big for i in self.allocation[self.small_candidate]])))
+        self.Swap(Big, self.big_candidate, Small, self.small_candidate)
+        self.cost = np.max(self.workload)
+        self.costTrajectory.append(self.cost)
+        print(self.cost)
+    
+    def print_results(self):
+        plt.bar(range(m),self.workload)
+        plt.show()
+        print('best workload found:', self.workload)
+        print('best allocation found:', self.allocation)
+        print('neighbours visited:', self.costTrajectory)
+        print('approximation ratio:',  self.cost/np.average(self.workload))
     
     def greedySearch(self,totalTime):
         self.generateGreedySolution()
-        while time.time() - self.initialTime < totalTime:
+        while time.time() - self.initialTime < totalTime - 0.1:
             self.greedySearchIteration()
-            if np.max(self.temp_workload) > self.cost:
-                plt.bar(range(m),self.workload)
-                plt.show()
-                print('best workload found:', self.workload)
-                print('best allocation found:', self.allocation)
-                print('neighbours visited:', self.costTrajectory)
-                return 
+            if self.cost > self.costTrajectory[-2]:
+                self.Swap(self.allocation[self.small_candidate][-1], self.small_candidate, 
+                          self.allocation[self.big_candidate][-1], self.big_candidate) ### swap back to last neighbour
+                self.cost = np.max(self.workload)
+                self.costTrajectory.append(self.cost)
+                print(self.cost)
+                self.print_results()
+                return
+        print('*****ALLOCATED TIME EXPIRED!*****')
+        print('BEST RESULT:')
+        self.print_results()
     
-    def verifyFeasibleSolution(A):
+    def verifyFeasibleSolution(self):
         # check that each job is assigned to exactly one machine
-        assert(sum([len(A.allocation[i]) for i in range(m)])) == len(p))
+        assert(sum([len(self.allocation[i]) for i in range(m)]) == len(p))
         # check that there are at most m machines that have jobs assigned to them
-        assert(len(A.allocation) <= m)
+        assert(len(self.allocation) <= m)
 
         # check that the workloads are as indicated in A.workload
         for i in range(m):
-        assert(A.workload[i] == sum(A.allocation[i]))
+            assert(self.workload[i] == sum(self.allocation[i]))
 
         # check that the maximum of the workloads (i.e. the cost) is as indicated in A.cost
-        assert(np.isclose(A.cost, np.max(A.workload)))
+        assert(np.isclose(self.cost, np.max(self.workload)))
             
     
             
 A = agent()
 A.greedySearch(allowableTime)
-verifyFeasibleSolution(A)
+A.verifyFeasibleSolution()
 
 
 ### Greedy makespan allocation algo is on pg 262 of text
