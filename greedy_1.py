@@ -28,18 +28,18 @@ def import_inst(filename):
     inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
     global p, m, allowableTime
     p =  inst[2:]
+    p.sort()
+    p = p[::-1]
     m = inst[1]
     allowableTime = inst[0]
 
 import_inst("instance.txt")
 
 
-# this defines an 'agent' object which would implement a heuristic to solve the makespan problem
-# note: for neatness, this should later be moved to its own file
 class agent:
     def __init__(self): 
         self.initialTime = time.time()
-        self.allocation = {x: [] for x in range(m)} ### A dictionary where we can keep track of which job is assigned to which machine ie: allocation[0] = [k_1, ...] are the jobs assigned to the first machine
+        self.allocation = {} # a dict for tracking  the allocated jobs to machines
         self.workload = np.zeros(m) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
@@ -51,9 +51,10 @@ class agent:
         ### couple of different ideas about how to sort this array - 
         ### see "https://stackoverflow.com/questions/26984414/efficiently-sorting-a-numpy-array-in-descending-order"
         ### to begin with, i'll go with an inplace sorting, but whether this is efficent we'll discuss later
-        
-        p[::-1].sort()
-        for i in range(len(p)):
+        for i in range(m):
+            self.allocation[i] = [p[i]]
+            self.workload[i] += p[i]
+        for i in range(m,len(p)):
             worker = np.argmin(self.workload)
             self.allocation[worker].append(p[i])
             self.workload[worker] += p[i]
