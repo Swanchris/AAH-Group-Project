@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import random
 import re
 from itertools import compress
-
+from copy import deepcopy
 
 allowableTime = 2 # time allowed in seconds
 p = 1 + np.random.randint(1000, size = 612) # job processing times
@@ -43,14 +43,12 @@ class agent:
         self.workload = np.zeros(m) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
-        self.big_candidate = None
-        self.small_candidate = None
+        self.workload_so_far = []
+        self.allocation_so_far = []
+
         
     # generates a greedy initial feasible solution
     def generateGreedySolution(self):
-        ### couple of different ideas about how to sort this array - 
-        ### see "https://stackoverflow.com/questions/26984414/efficiently-sorting-a-numpy-array-in-descending-order"
-        ### to begin with, i'll go with an inplace sorting, but whether this is efficent we'll discuss later
         for i in range(m):
             self.allocation[i] = [p[i]]
             self.workload[i] += p[i]
@@ -73,16 +71,19 @@ class agent:
         self.switchMachine(Big, big_candidate, small_candidate)
         self.switchMachine(Small, small_candidate, big_candidate)
     
-    def greedySearchIteration(self):
-        self.big_candidate = np.argmax(self.workload)
-        self.small_candidate = np.argmin(self.workload)
-        Big = np.max(self.allocation[self.big_candidate])
-        Small = np.max(list(compress(self.allocation[self.small_candidate],
-                                     [i < Big for i in self.allocation[self.small_candidate]])))
-        self.Swap(Big, self.big_candidate, Small, self.small_candidate)
+    def greedySearchIteration(self,k):
+        ind = np.argsort(self.workload)
+        for i in range(k):
+            big_candidate = ind[-(i+1)]
+            small_candidate = ind[i]
+            Big = np.max(self.allocation[big_candidate])
+            Small = np.max(list(compress(self.allocation[small_candidate],
+                                     [i < Big for i in self.allocation[small_candidate]])))
+            self.Swap(Big, big_candidate, Small, small_candidate)
         self.cost = np.max(self.workload)
         self.costTrajectory.append(self.cost)
-        print(self.cost)
+        self.workload_so_far.append(deepcopy(self.workload))
+        self.allocation_so_far.append(deepcopy(self.allocation))
     
     def print_results(self):
         plt.bar(range(m),self.workload)
@@ -91,17 +92,22 @@ class agent:
         print('best allocation found:', self.allocation)
         print('neighbours visited:', self.costTrajectory)
         print('approximation ratio:',  self.cost/np.average(self.workload))
+        print('time taken:', time.time() - self.initialTime)
     
-    def greedySearch(self,totalTime):
+    def greedySearch(self,totalTime,k):
         self.generateGreedySolution()
-        while time.time() - self.initialTime < totalTime - 0.1:
-            self.greedySearchIteration()
+        self.workload_so_far.append(deepcopy(self.workload))
+        self.allocation_so_far.append(deepcopy(self.allocation))
+        while time.time() - self.initialTime < totalTime - 0.31:
+            self.greedySearchIteration(k)
             if self.cost > self.costTrajectory[-2]:
-                self.Swap(self.allocation[self.small_candidate][-1], self.small_candidate, 
-                          self.allocation[self.big_candidate][-1], self.big_candidate) ### swap back to last neighbour
+                self.workload = deepcopy(self.workload_so_far[-2])
+                self.allocation = deepcopy(self.allocation_so_far[-2])
                 self.cost = np.max(self.workload)
-                self.costTrajectory.append(self.cost)
-                print(self.cost)
+                self.costTrajectory.append(self.cost) 
+                self.print_results()
+                return
+            if self.cost == self.costTrajectory[-2]:
                 self.print_results()
                 return
         print('*****ALLOCATED TIME EXPIRED!*****')
@@ -124,7 +130,7 @@ class agent:
     
             
 A = agent()
-A.greedySearch(allowableTime)
+A.greedySearch(allowableTime,k)
 A.verifyFeasibleSolution()
 
 
