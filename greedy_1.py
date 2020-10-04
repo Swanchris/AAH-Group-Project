@@ -15,9 +15,14 @@ inst = np.append(allowableTime,np.append(m,p))
 
 ### creating an example txt instance
 
-with open("instance.txt", "w") as f:
-    print(inst, file = f)
-    
+def create_instance(inp, filename):
+    txter = open(filename, "w")
+    for item in inp:
+        txter.write(str(item))
+        txter.write('\n')
+    txter.close()
+
+create_instance(p, "instance.txt")
 ### Given an instance will be of the form (𝑝1,𝑝2,⋯,𝑝𝑛,𝑚) we need to read the txt file in this way. We can then chop it up for the agent to manipulate
 
 def import_inst(filename):
