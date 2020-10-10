@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.random import randint as rint
 import time
 import matplotlib.pyplot as plt
 import random
@@ -6,26 +7,40 @@ import re
 from itertools import compress
 from copy import deepcopy
 
-allowableTime = 2 # time allowed in seconds
-p = 1 + np.random.randint(1000, size = 612) # job processing times
-p = np.append(p, 1 + np.random.randint(2001, size = 132))
-p = np.append(p, 1 + 1 + np.random.negative_binomial(n = 1500, p = 0.5, size = 201))
-m = 201 # number of machines
-inst = np.append(allowableTime,np.append(m,p))
-
 ### creating an example txt instance
 
-def create_instance(inp, filename):
+def create_instance(p_length_min, p_length_max, allowable_time, filename):
+    p = (1 + np.random.binomial(70000, np.random.beta(50, 4, size = np.random.randint(p_length_min,p_length_max)))).astype('int64') 
+    m = rint(0.4*len(p), 0.7*len(p))
+    allowableTime = allowable_time
+    inst = np.append(allowableTime,np.append(m,p))
     txter = open(filename, "w")
-    for item in inp:
+    for item in inst:
         txter.write(str(item))
         txter.write('\n')
     txter.close()
 
-create_instance(p, "instance.txt")
+def set_instance(p_length_min, p_length_max, allowable_time):
+    '''
+    takes an instance, converts it to an array and then allocates it to p and m, 
+    where p are the jobs and m is the number of machines
+    '''
+    global p, m, allowableTime
+    p = (1 + np.random.binomial(70000, np.random.beta(50, 4, size = np.random.randint(p_length_min,p_length_max)))).astype('int64') 
+    m = rint(0.4*len(p), 0.7*len(p))
+    allowableTime = allowable_time
+    inst = np.append(allowableTime,np.append(m,p))
+    
+    p = inst[2:]
+    p.sort()
+    p = p[::-1]
+    m = inst[1]
+    allowableTime = inst[0]
+    return p, m, allowableTime
+
 ### Given an instance will be of the form (𝑝1,𝑝2,⋯,𝑝𝑛,𝑚) we need to read the txt file in this way. We can then chop it up for the agent to manipulate
 
-def import_inst(filename):
+def import_instance(filename):
     '''
     imports a text file instance, converts it to an array and then allocates it to p and m, 
     where p are the jobs and m is the number of machines
@@ -37,11 +52,12 @@ def import_inst(filename):
     p = p[::-1]
     m = inst[1]
     allowableTime = inst[0]
+    return p, m, allowableTime
 
-import_inst("instance.txt")
 
 
-class agent:
+
+class agent():
     def __init__(self): 
         self.initialTime = time.time()
         self.allocation = {} # a dict for tracking  the allocated jobs to machines
@@ -82,9 +98,12 @@ class agent:
             big_candidate = ind[-(i+1)]
             small_candidate = ind[i]
             Big = np.max(self.allocation[big_candidate])
-            Small = np.max(list(compress(self.allocation[small_candidate],
-                                     [i < Big for i in self.allocation[small_candidate]])))
-            self.Swap(Big, big_candidate, Small, small_candidate)
+            if not list(compress(self.allocation[small_candidate], [i < Big for i in self.allocation[small_candidate]])):
+                self.switchMachine(Big, big_candidate, small_candidate)
+            else: 
+                Small = np.max(list(compress(self.allocation[small_candidate], [i < Big for i in self.allocation[small_candidate]])))
+                self.Swap(Big, big_candidate, Small, small_candidate)
+                
         self.cost = np.max(self.workload)
         self.costTrajectory.append(self.cost)
         self.workload_so_far.append(deepcopy(self.workload))
@@ -92,9 +111,10 @@ class agent:
     
     def print_results(self):
         plt.bar(range(m),self.workload)
+        plt.hlines(np.average(self.workload),0,len(self.workload), colors= 'y')
         plt.show()
-        print('best workload found:', self.workload)
-        print('best allocation found:', self.allocation)
+#         print('best workload found:', self.workload)
+#         print('best allocation found:', self.allocation)
         print('neighbours visited:', self.costTrajectory)
         print('approximation ratio:',  self.cost/np.average(self.workload))
         print('time taken:', time.time() - self.initialTime)
@@ -133,10 +153,5 @@ class agent:
         assert(np.isclose(self.cost, np.max(self.workload)))
             
     
-            
-A = agent()
-A.greedySearch(allowableTime,k)
-A.verifyFeasibleSolution()
-
 
 ### Greedy makespan allocation algo is on pg 262 of text

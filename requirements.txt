@@ -1,0 +1,10 @@
+numpy
+time
+matplotlib.pyplot
+random
+re
+itertools
+scipy.special
+scipy.stats
+math
+copy
