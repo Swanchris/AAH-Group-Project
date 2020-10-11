@@ -9,106 +9,94 @@ from copy import deepcopy
 
 ### creating an example txt instance
 
-def create_instance(p_length_min, p_length_max, allowable_time, filename):
-    p = (1 + np.random.binomial(70000, np.random.beta(50, 4, size = np.random.randint(p_length_min,p_length_max)))).astype('int64') 
-    m = rint(0.4*len(p), 0.7*len(p))
-    allowableTime = allowable_time
-    inst = np.append(allowableTime,np.append(m,p))
-    txter = open(filename, "w")
-    for item in inst:
-        txter.write(str(item))
-        txter.write('\n')
-    txter.close()
-
-def set_instance(p_length_min, p_length_max, allowable_time):
-    '''
-    takes an instance, converts it to an array and then allocates it to p and m, 
-    where p are the jobs and m is the number of machines
-    '''
-    global p, m, allowableTime
-    p = (1 + np.random.binomial(70000, np.random.beta(50, 4, size = np.random.randint(p_length_min,p_length_max)))).astype('int64') 
-    m = rint(0.4*len(p), 0.7*len(p))
-    allowableTime = allowable_time
-    inst = np.append(allowableTime,np.append(m,p))
-    
-    p = inst[2:]
-    p.sort()
-    p = p[::-1]
-    m = inst[1]
-    allowableTime = inst[0]
-    return p, m, allowableTime
-
-### Given an instance will be of the form (𝑝1,𝑝2,⋯,𝑝𝑛,𝑚) we need to read the txt file in this way. We can then chop it up for the agent to manipulate
-
-def import_instance(filename):
-    '''
-    imports a text file instance, converts it to an array and then allocates it to p and m, 
-    where p are the jobs and m is the number of machines
-    '''
-    inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
-    global p, m, allowableTime
-    p =  inst[2:]
-    p.sort()
-    p = p[::-1]
-    m = inst[1]
-    allowableTime = inst[0]
-    return p, m, allowableTime
-
-
-
-
+### Note that function names have been updated for consistent nomenclature
 class agent():
     def __init__(self): 
         self.initialTime = time.time()
-        self.allocation = {} # a dict for tracking  the allocated jobs to machines
-        self.workload = np.zeros(m) # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
+        # key is the index in p of job 'k' (from 0 to n-1) and element is the machine job 'k' is assigned to
+        self.assignedMachine = {} 
+        # Note that the index of p relates to the index of assignedMachine
+        # index is machine and element is the sum of processing times of jobs assigned to machine
+        self.workload = np.zeros(m) 
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
-        self.workload_so_far = []
-        self.allocation_so_far = []
-
-        
-    # generates a greedy initial feasible solution
-    def generateGreedySolution(self):
-        for i in range(m):
-            self.allocation[i] = [p[i]]
-            self.workload[i] += p[i]
-        for i in range(m,len(p)):
-            worker = np.argmin(self.workload)
-            self.allocation[worker].append(p[i])
-            self.workload[worker] += p[i]
-        self.cost = np.max(self.workload)
-        self.costTrajectory.append(self.cost)
-        
-        
-    # switch assigned machine of 'job' to 'toMachine'
-    def switchMachine(self,  job, fromMachine, toMachine):
-        self.workload[fromMachine] += - job
-        self.allocation[fromMachine].remove(job)
-        self.workload[toMachine] += job
-        self.allocation[toMachine].append(job)
+        self.workloadTrajectory = [] # list of workloads of feasible solution found in each step
+        self.assignedMachineTrajectory = [] # list of allocations found in each step
     
-    def Swap(self, Big, big_candidate, Small, small_candidate):
-        self.switchMachine(Big, big_candidate, small_candidate)
-        self.switchMachine(Small, small_candidate, big_candidate)
+    def greedySearch(self,totalTime,k):
+        self.generateGreedySolution(m) # run function 
+        while time.time() - self.initialTime < totalTime - 0.31: # keeps algorithm within alocated time
+            self.greedySearchIteration(k) # performs k-exchange
+            if self.cost > self.costTrajectory[-2]: # if local minimum is reached, return algorithm. attributes update
+                self.workload = deepcopy(self.workloadTrajectory[-2])
+                self.assignedMachine = deepcopy(self.assignedMachineTrajectory[-2])
+                self.cost = np.max(self.workload)
+                self.costTrajectory.append(self.cost) 
+#                 self.verifyFeasibleSolution() # independently checks that result meet constraints
+                self.print_results()
+                return
+            if self.cost == self.costTrajectory[-2]: # if neighbour is same as last, return
+#                 self.verifyFeasibleSolution()
+                self.print_results()
+                return
+        print('*****ALLOCATED TIME EXPIRED!*****')
+        print('BEST RESULT:')
+#         self.verifyFeasibleSolution()
+        self.print_results()
+    
+    def generateGreedySolution(self): # generates a greedy initial feasible solution
+        for i in range(m): # initial allocation of m largest jobs
+            self.workload[i] += p[sortedOrder[i]] # adds job i in sortedOrder (ref to p) to the workload of machine i
+            self.assignedMachine[sortedOrder[i]] = i # assigns machine to relevant job
+        for i in range(m,len(p)): # distributed rest of jobs sequentially to machine with smallest workload
+            worker = np.argmin(self.workload) # finds machine with smallest makespan
+            self.assignedMachine[sortedOrder[i]] = worker # allocates next job (i) to that machine
+            self.workload[worker] += p[sortedOrder[i]] # updates workload
+        self.cost = np.max(self.workload) # updates current cost
+        self.costTrajectory.append(self.cost) # updates list of cost (neighbours visited)
+        self.workloadTrajectory.append(deepcopy(self.workload)) # saves current workload
+        self.assignedMachineTrajectory.append(deepcopy(self.assignedMachine)) # saves current allocation
     
     def greedySearchIteration(self,k):
-        ind = np.argsort(self.workload)
+        ind = np.argsort(self.workload) # sorts workload indices
+        # k-exchange - swaps the biggest element 'Big' in machine with largest workload with the biggest element 'Small'
+        # in machine with smallest workload such that 'Big' > 'Small'
         for i in range(k):
-            big_candidate = ind[-(i+1)]
-            small_candidate = ind[i]
-            Big = np.max(self.allocation[big_candidate])
-            if not list(compress(self.allocation[small_candidate], [i < Big for i in self.allocation[small_candidate]])):
-                self.switchMachine(Big, big_candidate, small_candidate)
-            else: 
-                Small = np.max(list(compress(self.allocation[small_candidate], [i < Big for i in self.allocation[small_candidate]])))
-                self.Swap(Big, big_candidate, Small, small_candidate)
-                
-        self.cost = np.max(self.workload)
-        self.costTrajectory.append(self.cost)
-        self.workload_so_far.append(deepcopy(self.workload))
-        self.allocation_so_far.append(deepcopy(self.allocation))
+            big_candidate = ind[-(i+1)] # finds machine with biggest workload
+            small_candidate = ind[i] # finds machine with smallest workload
+            
+            # finds biggest/smallest job index allocated to candidates by making a list of machine workloads
+            big_machine_workload = [i for i in [j for j, x in enumerate(self.assignedMachine) if x == big_candidate]]
+            small_machine_workload = [i for i in [j for j, x in enumerate(self.assignedMachine) if x == small_candidate]]
+            
+            Big = np.max([p[i] for i in big_machine_workload]) # largest job in 'big_machine_workload'
+            Big_index = np.argmax([p[i] for i in big_machine_workload]) # index in 'p' of largest job in 'big_machine_workload'
+            
+            # list of all elements in 'small_machine_workload' that are smaller than 'Big'
+            small_list = list(compress( [p[i] for i in small_machine_workload] , [p[i] < Big for i in small_machine_workload]))
+            # indices in 'p' of the above
+            small_list_ind = list(compress( small_machine_workload , [p[i] < Big for i in small_machine_workload]))
+            if not small_list: # if no element is smaller, just moves 'Big' to 'small_candidate'
+                self.switchMachine(Big, Big_index, big_candidate, small_candidate)
+            else: # swaps biggest element in 'small_list' with biggest element in 'big_candidate'
+                Small = np.max(small_list)
+                Small_index = small_list_ind[np.argmax(small_list)]
+                self.Swap(Big, Big_index, big_candidate, Small, Small_index, small_candidate)
+        self.cost = np.max(self.workload) # updates 'cost'
+        self.costTrajectory.append(self.cost) # updates 'costTrajectory'
+        self.workloadTrajectory.append(deepcopy(self.workload)) # updates workloadTrajectory
+        self.assignedMachineTrajectory.append(deepcopy(self.assignedMachine)) # updates assignedMachineTrajectory
     
+    def Swap(self, Big, Big_index, big_candidate, Small, Small_index, small_candidate):
+        self.switchMachine(Big, Big_index, big_candidate, small_candidate)
+        self.switchMachine(Small, Small_index, small_candidate, big_candidate)
+        
+    # switch assigned machine of 'job' to 'toMachine'
+    def switchMachine(self,  job, job_index, fromMachine, toMachine):
+        self.workload[fromMachine] += - job
+        self.workload[toMachine] += job
+        self.assignedMachine[job_index] = toMachine
+            
     def print_results(self):
         plt.bar(range(m),self.workload)
         plt.hlines(np.average(self.workload),0,len(self.workload), colors= 'y')
@@ -119,39 +107,20 @@ class agent():
         print('approximation ratio:',  self.cost/np.average(self.workload))
         print('time taken:', time.time() - self.initialTime)
     
-    def greedySearch(self,totalTime,k):
-        self.generateGreedySolution()
-        self.workload_so_far.append(deepcopy(self.workload))
-        self.allocation_so_far.append(deepcopy(self.allocation))
-        while time.time() - self.initialTime < totalTime - 0.31:
-            self.greedySearchIteration(k)
-            if self.cost > self.costTrajectory[-2]:
-                self.workload = deepcopy(self.workload_so_far[-2])
-                self.allocation = deepcopy(self.allocation_so_far[-2])
-                self.cost = np.max(self.workload)
-                self.costTrajectory.append(self.cost) 
-                self.print_results()
-                return
-            if self.cost == self.costTrajectory[-2]:
-                self.print_results()
-                return
-        print('*****ALLOCATED TIME EXPIRED!*****')
-        print('BEST RESULT:')
-        self.print_results()
-    
+        # determines whether the solution found by A is indeed feasible, input: A is an 'agent' object
+    # and returns a feasible solution as a set of subsets of the jobs
     def verifyFeasibleSolution(self):
-        # check that each job is assigned to exactly one machine
-        assert(sum([len(self.allocation[i]) for i in range(m)]) == len(p))
-        # check that there are at most m machines that have jobs assigned to them
-        assert(len(self.allocation) <= m)
-
-        # check that the workloads are as indicated in A.workload
+        solution = [set({}) for i in range(m)] # solution is a list of subsets of the jobs
+        for i in range(len(p)):
+            solution[self.assignedMachine[i]].add(i) # add job i to the set corresponding to the machine it is allocated to
+        setOfJobs = set(range(len(p))) # set of all jobs {0, ..., number of jobs - 1}
         for i in range(m):
-            assert(self.workload[i] == sum(self.allocation[i]))
+            assert(set.issubset(solution[i], setOfJobs)) # assert set i is a subset of the jobs
+        assert(set.union(*solution) == setOfJobs) # assert that the union of all the sets is the set of all jobs
+        for i in range(m-1):
+            for j in range(i+1, m):
+                assert(set.intersection(solution[i], solution[j]) == set()) # assert pair of sets i and j, for i != j, are disjoint
+        cost = max([sum([p[i] for i in solution[machine]]) for machine in range(m)])
+        assert(self.cost == cost) # assert self.cost is consistent with objective value of solution
+        return (solution, cost)
 
-        # check that the maximum of the workloads (i.e. the cost) is as indicated in A.cost
-        assert(np.isclose(self.cost, np.max(self.workload)))
-            
-    
-
-### Greedy makespan allocation algo is on pg 262 of text
