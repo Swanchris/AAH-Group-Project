@@ -7,8 +7,6 @@ import re
 from itertools import compress
 from copy import deepcopy
 
-### creating an example txt instance
-
 ### Note that function names have been updated for consistent nomenclature
 class agent():
     def __init__(self): 
@@ -17,34 +15,35 @@ class agent():
         self.assignedMachine = {} 
         # Note that the index of p relates to the index of assignedMachine
         # index is machine and element is the sum of processing times of jobs assigned to machine
-        self.workload = np.zeros(m) 
+        self.workload = None 
         self.cost = None # cost of current feasible solution
         self.costTrajectory = [] # list of cost of feasible solution found in each step
         self.workloadTrajectory = [] # list of workloads of feasible solution found in each step
         self.assignedMachineTrajectory = [] # list of allocations found in each step
     
-    def greedySearch(self,totalTime,k):
-        self.generateGreedySolution(m) # run function 
+    def greedySearch(self,totalTime,k, m,  p, sortedOrder):
+        self.generateGreedySolution(m, p , sortedOrder) # run function 
         while time.time() - self.initialTime < totalTime - 0.31: # keeps algorithm within alocated time
-            self.greedySearchIteration(k) # performs k-exchange
+            self.greedySearchIteration(k, m, p, sortedOrder) # performs k-exchange
             if self.cost > self.costTrajectory[-2]: # if local minimum is reached, return algorithm. attributes update
                 self.workload = deepcopy(self.workloadTrajectory[-2])
                 self.assignedMachine = deepcopy(self.assignedMachineTrajectory[-2])
                 self.cost = np.max(self.workload)
                 self.costTrajectory.append(self.cost) 
-#                 self.verifyFeasibleSolution() # independently checks that result meet constraints
-                self.print_results()
+                self.verifyFeasibleSolution(m, p, sortedOrder) # independently checks that result meet constraints
+                self.print_results(m)
                 return
             if self.cost == self.costTrajectory[-2]: # if neighbour is same as last, return
-#                 self.verifyFeasibleSolution()
-                self.print_results()
+                self.verifyFeasibleSolution(m, p, sortedOrder)
+                self.print_results(m)
                 return
         print('*****ALLOCATED TIME EXPIRED!*****')
         print('BEST RESULT:')
-#         self.verifyFeasibleSolution()
-        self.print_results()
+        self.verifyFeasibleSolution(m, p, sortedOrder)
+        self.print_results(m)
     
-    def generateGreedySolution(self): # generates a greedy initial feasible solution
+    def generateGreedySolution(self, m, p, sortedOrder): # generates a greedy initial feasible solution
+        self.workload = np.zeros(m)
         for i in range(m): # initial allocation of m largest jobs
             self.workload[i] += p[sortedOrder[i]] # adds job i in sortedOrder (ref to p) to the workload of machine i
             self.assignedMachine[sortedOrder[i]] = i # assigns machine to relevant job
@@ -57,7 +56,7 @@ class agent():
         self.workloadTrajectory.append(deepcopy(self.workload)) # saves current workload
         self.assignedMachineTrajectory.append(deepcopy(self.assignedMachine)) # saves current allocation
     
-    def greedySearchIteration(self,k):
+    def greedySearchIteration(self,k, m, p, sortedOrder):
         ind = np.argsort(self.workload) # sorts workload indices
         # k-exchange - swaps the biggest element 'Big' in machine with largest workload with the biggest element 'Small'
         # in machine with smallest workload such that 'Big' > 'Small'
@@ -65,9 +64,9 @@ class agent():
             big_candidate = ind[-(i+1)] # finds machine with biggest workload
             small_candidate = ind[i] # finds machine with smallest workload
             
-            # finds biggest/smallest job index allocated to candidates by making a list of machine workloads
-            big_machine_workload = [i for i in [j for j, x in enumerate(self.assignedMachine) if x == big_candidate]]
-            small_machine_workload = [i for i in [j for j, x in enumerate(self.assignedMachine) if x == small_candidate]]
+            # finds biggest/smallest index of job allocated to candidates by making a list of machine workloads
+            big_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == big_candidate]
+            small_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == small_candidate]
             
             Big = np.max([p[i] for i in big_machine_workload]) # largest job in 'big_machine_workload'
             Big_index = np.argmax([p[i] for i in big_machine_workload]) # index in 'p' of largest job in 'big_machine_workload'
@@ -97,19 +96,17 @@ class agent():
         self.workload[toMachine] += job
         self.assignedMachine[job_index] = toMachine
             
-    def print_results(self):
+    def print_results(self, m):
         plt.bar(range(m),self.workload)
         plt.hlines(np.average(self.workload),0,len(self.workload), colors= 'y')
         plt.show()
-#         print('best workload found:', self.workload)
-#         print('best allocation found:', self.allocation)
         print('neighbours visited:', self.costTrajectory)
         print('approximation ratio:',  self.cost/np.average(self.workload))
         print('time taken:', time.time() - self.initialTime)
     
         # determines whether the solution found by A is indeed feasible, input: A is an 'agent' object
     # and returns a feasible solution as a set of subsets of the jobs
-    def verifyFeasibleSolution(self):
+    def verifyFeasibleSolution(self, m, p, sortedOrder):
         solution = [set({}) for i in range(m)] # solution is a list of subsets of the jobs
         for i in range(len(p)):
             solution[self.assignedMachine[i]].add(i) # add job i to the set corresponding to the machine it is allocated to
@@ -123,4 +120,3 @@ class agent():
         cost = max([sum([p[i] for i in solution[machine]]) for machine in range(m)])
         assert(self.cost == cost) # assert self.cost is consistent with objective value of solution
         return (solution, cost)
-
