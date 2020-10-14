@@ -1,0 +1,1 @@
+This folder contains functions for the heuristic solver and its experimental testing. See the report for a description of how it works, but be aware that the description currently given in the report is not complete.
