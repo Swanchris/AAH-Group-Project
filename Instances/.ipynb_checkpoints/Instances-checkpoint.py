@@ -31,16 +31,16 @@ def importInstance(filename):
 
 
 
-def generate(time, folder):
-    allowableTime = time
+def generate():
+    allowableTime = 10
     kinds = ["discreteUniform", "largeJobs", "extremes", "centred"]
     params = {"discreteUniform" : (1, 1), "largeJobs" : (10, 2), "extremes" : (1/2, 1/2), "centred" : (4, 4)}
 
-    for nmagnitude in range(1, 5+1):
+    for nmagnitude in range(1, 4+1):
         for mfrac in range(1, 4+1):
             for kind in kinds:
                 for i in range(1, 10+1):
-                    filename = folder + "/" + str(allowableTime) + " " + str(mfrac) + " " + str(nmagnitude) + " " + kind + " " + str(i) + ".txt"
+                    filename = str(allowableTime) + " " + str(mfrac) + " " + str(nmagnitude) + " " + kind + " " + str(i) + ".txt"
                     alpha, beta = params[kind]
                     n = 10**nmagnitude
                     m = (mfrac/5)*n

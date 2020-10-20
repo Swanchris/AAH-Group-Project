@@ -24,23 +24,27 @@ class agent():
     def greedySearch(self,totalTime,k, m,  p, sortedOrder):
         self.generateGreedySolution(m, p , sortedOrder) # run function 
         while time.time() - self.initialTime < totalTime - 0.31: # keeps algorithm within alocated time
-            self.greedySearchIteration(k, m, p, sortedOrder) # performs k-exchange
+            try:
+                self.greedySearchIteration(k, m, p, sortedOrder) # performs k-exchange
+            except ValueError:
+                return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
             if self.cost > self.costTrajectory[-2]: # if local minimum is reached, return algorithm. attributes update
                 self.workload = deepcopy(self.workloadTrajectory[-2])
                 self.assignedMachine = deepcopy(self.assignedMachineTrajectory[-2])
                 self.cost = np.max(self.workload)
                 self.costTrajectory.append(self.cost) 
-                self.verifyFeasibleSolution(m, p, sortedOrder) # independently checks that result meet constraints
-                self.print_results(m)
-                return
+#                 self.verifyFeasibleSolution(m, p, sortedOrder) # independently checks that result meet constraints
+#                 self.print_results(m)
+                return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
             if self.cost == self.costTrajectory[-2]: # if neighbour is same as last, return
-                self.verifyFeasibleSolution(m, p, sortedOrder)
-                self.print_results(m)
-                return
-        print('*****ALLOCATED TIME EXPIRED!*****')
-        print('BEST RESULT:')
-        self.verifyFeasibleSolution(m, p, sortedOrder)
-        self.print_results(m)
+#                 self.verifyFeasibleSolution(m, p, sortedOrder)
+#                 self.print_results(m)
+                return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
+#         print('*****ALLOCATED TIME EXPIRED!*****')
+#         print('BEST RESULT:')
+#         self.verifyFeasibleSolution(m, p, sortedOrder)
+#         self.print_results(m)
+        return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
     
     def generateGreedySolution(self, m, p, sortedOrder): # generates a greedy initial feasible solution
         self.workload = np.zeros(m)
@@ -60,31 +64,33 @@ class agent():
         ind = np.argsort(self.workload) # sorts workload indices
         # k-exchange - swaps the biggest element 'Big' in machine with largest workload with the biggest element 'Small'
         # in machine with smallest workload such that 'Big' > 'Small'
-        for i in range(k):
-            big_candidate = ind[-(i+1)] # finds machine with biggest workload
-            small_candidate = ind[i] # finds machine with smallest workload
-            
-            # finds biggest/smallest index of job allocated to candidates by making a list of machine workloads
-            big_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == big_candidate]
-            small_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == small_candidate]
-            
-            Big = np.max([p[i] for i in big_machine_workload]) # largest job in 'big_machine_workload'
-            Big_index = np.argmax([p[i] for i in big_machine_workload]) # index in 'p' of largest job in 'big_machine_workload'
-            
-            # list of all elements in 'small_machine_workload' that are smaller than 'Big'
-            small_list = list(compress( [p[i] for i in small_machine_workload] , [p[i] < Big for i in small_machine_workload]))
-            # indices in 'p' of the above
-            small_list_ind = list(compress( small_machine_workload , [p[i] < Big for i in small_machine_workload]))
-            if not small_list: # if no element is smaller, just moves 'Big' to 'small_candidate'
-                self.switchMachine(Big, Big_index, big_candidate, small_candidate)
-            else: # swaps biggest element in 'small_list' with biggest element in 'big_candidate'
-                Small = np.max(small_list)
-                Small_index = small_list_ind[np.argmax(small_list)]
-                self.Swap(Big, Big_index, big_candidate, Small, Small_index, small_candidate)
-        self.cost = np.max(self.workload) # updates 'cost'
-        self.costTrajectory.append(self.cost) # updates 'costTrajectory'
-        self.workloadTrajectory.append(deepcopy(self.workload)) # updates workloadTrajectory
-        self.assignedMachineTrajectory.append(deepcopy(self.assignedMachine)) # updates assignedMachineTrajectory
+        if len(ind) > 0:
+        	for i in range(k):
+	            if i < len(ind):
+	                big_candidate = ind[-(i+1)] # finds machine with biggest workload
+	                small_candidate = ind[i] # finds machine with smallest workload
+
+	                # finds biggest/smallest index of job allocated to candidates by making a list of machine workloads
+	                big_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == big_candidate]
+	                small_machine_workload = [x for j, (x,y) in enumerate(self.assignedMachine.items()) if y == small_candidate]
+
+	                Big = np.max([p[i] for i in big_machine_workload]) # largest job in 'big_machine_workload'
+	                Big_index = np.argmax([p[i] for i in big_machine_workload]) # index in 'p' of largest job in 'big_machine_workload'
+
+	                # list of all elements in 'small_machine_workload' that are smaller than 'Big'
+	                small_list = list(compress( [p[i] for i in small_machine_workload] , [p[i] < Big for i in small_machine_workload]))
+	                # indices in 'p' of the above
+	                small_list_ind = list(compress( small_machine_workload , [p[i] < Big for i in small_machine_workload]))
+	                if not small_list: # if no element is smaller, just moves 'Big' to 'small_candidate'
+	                    self.switchMachine(Big, Big_index, big_candidate, small_candidate)
+	                else: # swaps biggest element in 'small_list' with biggest element in 'big_candidate'
+	                    Small = np.max(small_list)
+	                    Small_index = small_list_ind[np.argmax(small_list)]
+	                    self.Swap(Big, Big_index, big_candidate, Small, Small_index, small_candidate)
+	        self.cost = np.max(self.workload) # updates 'cost'
+	        self.costTrajectory.append(self.cost) # updates 'costTrajectory'
+	        self.workloadTrajectory.append(deepcopy(self.workload)) # updates workloadTrajectory
+	        self.assignedMachineTrajectory.append(deepcopy(self.assignedMachine)) # updates assignedMachineTrajectory
     
     def Swap(self, Big, Big_index, big_candidate, Small, Small_index, small_candidate):
         self.switchMachine(Big, Big_index, big_candidate, small_candidate)
