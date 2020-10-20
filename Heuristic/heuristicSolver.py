@@ -8,13 +8,17 @@ from operator import itemgetter
 from heuristicAgentNumbaFunctions import greedySwap, greedyMove
 import math
 
+
+from sklearn.utils.random import sample_without_replacement #########################
+
+
 class agentBase:
     def __init__(self, initialTime, allowableTime): 
         ### Does this need to be __init__(self, machine, workload) ? Or do we only want self because different methods take different attributes ?
         self.assignedMachine = None # list of length len(p), where self.assignedMachine[job] = machine assigned to job
         self.workload = None # np.array of length m, where self.workload[machine] = sum of processing times of jobs assigned to machine
         self.cost = None # cost of current feasible solution
-        self.costTrajectory = None # list of cost of feasible solution found in each step
+        # self.costTrajectory = None # list of cost of feasible solution found in each step
         self.jobsOfMachine = None
         self.bestCost = None
         self.bestSolutionCopy = None
@@ -24,7 +28,7 @@ class agentBase:
     def generateRandomAllocation(self, m, p):
         self.workload = np.zeros(m)
         self.cost = None
-        self.costTrajectory = []
+        # self.costTrajectory = []
         self.jobsOfMachine = [[] for machine in range(m)]
         self.assignedMachine = np.random.randint(0, m, size = len(p))
         np.add.at(self.workload, self.assignedMachine, p)
@@ -33,7 +37,7 @@ class agentBase:
         self.cost = np.max(self.workload)
         self.bestCost = self.cost
         self.bestSolutionCopy = self.assignedMachine.copy()
-        self.costTrajectory.append(self.cost)
+        # self.costTrajectory.append(self.cost)
     # modified from GLS_parameter_tuning.ipynb in AAH-Group-Project to work here
     # generates a greedy initial feasible solution, uses a heap data structure to keep track of minimum workload across machines
 
@@ -43,7 +47,7 @@ class agentBase:
         self.assignedMachine = list(-np.ones(len(p), dtype = int))
         self.workload = [0 for i in range(m)]
         self.jobsOfMachine = [[] for machine in range(m)]
-        self.costTrajectory = []
+        # self.costTrajectory = []
         for i in range(m):
             job = sortedOrder[i]
             self.assignedMachine[job] = i # assign machine 'i' to 'job'
@@ -60,7 +64,7 @@ class agentBase:
         self.workload.sort(key = itemgetter(1)) # reorder so that machine workloads are in increasing order of machine number
         self.workload = np.array(list(map(itemgetter(0), self.workload))) # convert self.workload into np.array of integer workloads
         self.cost = np.max(self.workload)
-        self.costTrajectory.append(self.cost)
+        # self.costTrajectory.append(self.cost)
         self.bestCost = self.cost
         self.assignedMachine = np.array(self.assignedMachine)
         self.bestSolutionCopy = self.assignedMachine.copy()
@@ -100,7 +104,7 @@ class agent(agentBase):
     def searchIteration(self, m, p, increasingSortedOrder, neighbourhood):
         maxMachine = np.argmax(self.workload)
         self.cost = self.workload[maxMachine]
-        self.costTrajectory.append(self.cost)
+        # self.costTrajectory.append(self.cost)
         jobsOfMaxMachine = np.array(self.jobsOfMachine[maxMachine])
 
         minMachine = np.argmin(self.workload)
@@ -128,18 +132,23 @@ class agent(agentBase):
     # given that the probability of any particular element of the solution vector mutating is tau, mutate accordingly
     def mutate(self, m, p, tau):
         k = np.random.binomial(len(p), tau)
+        jobsToMutate = list(sample_without_replacement(len(p), k))
+        toMachines = [int(m*random.random()) for i in range(k)]
         for i in range(k):
-            self.switchMachine(p, int(len(p)*random.random()), int(m*random.random()))
+            self.switchMachine(p, jobsToMutate[i], toMachines[i])
     
     # search for better solutions, mutating when we have reached a local optimum and decreasing the mutation probability with time
     def search(self, m, p, increasingSortedOrder, rho, neighbourhood):
-        while time.time() - self.initialTime < 0.99*self.allowableTime: ############# CHANGE TIME LIMIT
+        while time.time() - self.initialTime < 0.985*self.allowableTime: ############# CHANGE TIME LIMIT
             balanced = self.searchIteration(m, p, increasingSortedOrder, neighbourhood)
             if balanced:
                 if self.cost < self.bestCost:
                     self.bestCost = self.cost
                     self.bestSolutionCopy = self.assignedMachine.copy()
-                tau = math.pow(rho, (time.time() - self.initialTime)/self.allowableTime)
+                if rho > 0:
+                    tau = math.exp((time.time() - self.initialTime)/self.allowableTime * math.log(rho))
+                else:
+                    tau = 0
                 self.mutate(m, p, tau)
 
 class solver:
@@ -157,11 +166,10 @@ class solver:
         where p are the jobs and m is the number of machines
         '''
         inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
-        p = np.array(inst[2:])
-        sortedOrder = np.argsort(p)[::-1] # get index order of (decreasing) sorted array p
-        m = inst[1]
-        allowableTime = inst[0]
-        return p, m, allowableTime, sortedOrder
+        self.p = np.array(inst[2:]).astype('int64')
+        self.sortedOrder = np.argsort(self.p)[::-1] # get index order of (decreasing) sorted array p
+        self.m = inst[1]
+        self.allowableTime = inst[0]
 
     # determines whether the solution found is indeed feasible
     # input: m is number of machines, p is array of job sizes, solution is a list of sets of job indexes, cost is objective value of solution
@@ -176,9 +184,7 @@ class solver:
         assert(cost == max([sum([self.p[i] for i in solution[machine]]) for machine in range(self.m)])) # assert cost is consistent with objective value of solution
 
 
-    def solve(self, filename, rho, startMethod, neighbourhood):
-        self.p, self.m, self.allowableTime, self.sortedOrder = self.importInstance(filename)
-
+    def solve(self, rho, startMethod, neighbourhood):
         self.initialTime = time.time()
 
         increasingSortedOrder = self.sortedOrder[::-1]
@@ -202,12 +208,23 @@ class solver:
         # print(self.lowerBound)
         # approximationRatio = A.bestCost/self.lowerBound
         # print(approximationRatio)
+        # plt.style.use("seaborn-dark")
+        # plt.xlabel("iteration")
+        # plt.ylabel("cost of feasible solution")
         # plt.plot(A.costTrajectory)
         # plt.axhline(y = self.lowerBound, color = "gold") # lower bound for global minimum
         #########################################
         return (solution, cost, timeElapsed)
 
+def solveInstance(filename):
+    X = solver()
+    X.importInstance(filename)
+    sol = X.solve(math.pow(len(X.p), -3/2), "greedy", "swap")
+    print("objective value: ", sol[1])
+    print("lower bound for optimal: ", X.lowerBound)
+    print("time elapsed: ", sol[2], "seconds")
+    # print("feasible solution: ", sol[0]) # ADD press any key for feasible solution???
+    return sol
 
 
-# X = solver()
-# sol = X.solve("instances/" + "10 1 4 centred 4.txt", 1/10**5, "random", "swap")
+# sol = solveInstance("instances/" + "10 1 4 centred 4.txt")
