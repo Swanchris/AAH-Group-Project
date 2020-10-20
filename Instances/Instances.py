@@ -36,7 +36,7 @@ def generate():
     kinds = ["discreteUniform", "largeJobs", "extremes", "centred"]
     params = {"discreteUniform" : (1, 1), "largeJobs" : (10, 2), "extremes" : (1/2, 1/2), "centred" : (4, 4)}
 
-    for nmagnitude in range(1, 4+1):
+    for nmagnitude in range(1, 5+1):
         for mfrac in range(1, 4+1):
             for kind in kinds:
                 for i in range(1, 10+1):
