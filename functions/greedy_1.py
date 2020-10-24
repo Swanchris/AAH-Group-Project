@@ -33,17 +33,17 @@ class agent():
                 self.assignedMachine = deepcopy(self.assignedMachineTrajectory[-2])
                 self.cost = np.max(self.workload)
                 self.costTrajectory.append(self.cost) 
-#                 self.verifyFeasibleSolution(m, p, sortedOrder) # independently checks that result meet constraints
-#                 self.print_results(m)
+                self.verifyFeasibleSolution(m, p, sortedOrder) # independently checks that result meet constraints
+                self.print_results(m)
                 return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
             if self.cost == self.costTrajectory[-2]: # if neighbour is same as last, return
-#                 self.verifyFeasibleSolution(m, p, sortedOrder)
-#                 self.print_results(m)
+                self.verifyFeasibleSolution(m, p, sortedOrder)
+                self.print_results(m)
                 return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
-#         print('*****ALLOCATED TIME EXPIRED!*****')
-#         print('BEST RESULT:')
-#         self.verifyFeasibleSolution(m, p, sortedOrder)
-#         self.print_results(m)
+        print('*****ALLOCATED TIME EXPIRED!*****')
+        print('BEST RESULT:')
+        self.verifyFeasibleSolution(m, p, sortedOrder)
+        self.print_results(m)
         return [m, len(p), k, self.cost, time.time() - self.initialTime, self.cost/np.average(self.workload)]
     
     def generateGreedySolution(self, m, p, sortedOrder): # generates a greedy initial feasible solution
