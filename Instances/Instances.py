@@ -23,7 +23,7 @@ def importInstance(filename):
     '''
     inst = list(map(int, re.findall('\d+', str([line.rstrip('\n') for line in open(filename)]))))
     global p, m, allowableTime, sortedOrder
-    p = inst[2:]
+    p = np.array(inst[2:]).astype('int64')
     sortedOrder = np.argsort(p)[::-1] # get index order of (decreasing) sorted array p
     m = inst[1]
     allowableTime = inst[0]
