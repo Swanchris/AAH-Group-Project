@@ -2,7 +2,7 @@ import numpy as np
 import time
 import random
 import re
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt # uncomment for plots
 import heapq
 from operator import itemgetter
 from heuristicAgentNumbaFunctions import greedySwap, greedyMove
@@ -24,6 +24,8 @@ class agentBase:
         self.bestSolutionCopy = None
         self.initialTime = initialTime
         self.allowableTime = allowableTime
+        self.timeToBestCost = None
+        self.lowerBound = None
     # generates a random initial feasible solution
     def generateRandomAllocation(self, m, p):
         self.workload = np.zeros(m)
@@ -36,9 +38,10 @@ class agentBase:
             self.jobsOfMachine[self.assignedMachine[job]].append(job)
         self.cost = np.max(self.workload)
         self.bestCost = self.cost
+        self.timeToBestCost = time.time() - self.initialTime
         self.bestSolutionCopy = self.assignedMachine.copy()
+        self.lowerBound = max(np.sum(p)/m, np.max(p))
         # self.costTrajectory.append(self.cost)
-    # modified from GLS_parameter_tuning.ipynb in AAH-Group-Project to work here
     # generates a greedy initial feasible solution, uses a heap data structure to keep track of minimum workload across machines
 
     # note: ADD CHECKS TO ENSURE THE ALGORITHM RUNS WITHIN THE ALLOWED TIME
@@ -66,8 +69,10 @@ class agentBase:
         self.cost = np.max(self.workload)
         # self.costTrajectory.append(self.cost)
         self.bestCost = self.cost
+        self.timeToBestCost = time.time() - self.initialTime
         self.assignedMachine = np.array(self.assignedMachine)
         self.bestSolutionCopy = self.assignedMachine.copy()
+        self.lowerBound = max(np.sum(p)/m, np.max(p))
     # switch assigned machine of 'job' to 'toMachine'
     def switchMachine(self, p, job, toMachine):
         prevMachine = self.assignedMachine[job]
@@ -144,7 +149,10 @@ class agent(agentBase):
             if balanced:
                 if self.cost < self.bestCost:
                     self.bestCost = self.cost
+                    self.timeToBestCost = time.time() - self.initialTime
                     self.bestSolutionCopy = self.assignedMachine.copy()
+                if self.cost == math.ceil(self.lowerBound):    # if cost is definitely optimal, stop search
+                    break
                 if rho > 0:
                     tau = math.exp((time.time() - self.initialTime)/self.allowableTime * math.log(rho))
                 else:
@@ -158,8 +166,6 @@ class solver:
         self.allowableTime = None
         self.sortedOrder = None
         self.lowerBound = None
-        #################################################
-    # from GLS_parameter_tuning.ipynb in AAH project folder
     def importInstance(self, filename):
         '''
         imports a text file instance, converts it to an array and then allocates it to p and m, 
@@ -174,13 +180,24 @@ class solver:
     # determines whether the solution found is indeed feasible
     # input: m is number of machines, p is array of job sizes, solution is a list of sets of job indexes, cost is objective value of solution
     def verifyFeasibleSolution(self, solution, cost):
-        setOfJobs = set(range(len(self.p))) # set of all jobs {0, ..., number of jobs - 1}
+        n = len(self.p)
+        setOfJobs = set(range(n)) # set of all jobs {0, ..., number of jobs - 1}
         for i in range(self.m):
             assert(set.issubset(solution[i], setOfJobs)) # assert set i is a subset of the jobs
         assert(set.union(*solution) == setOfJobs) # assert that the union of all the sets is the set of all jobs
-        for i in range(self.m-1):
-            for j in range(i+1, self.m):
-                assert(set.intersection(solution[i], solution[j]) == set()) # assert pair of sets i and j, for i != j, are disjoint
+
+        # check that each job appears no more than once in the sets, which implies the sets are pairwise disjoint
+        count = [0 for i in range(n)] # number of occurrences of each job in the sets
+        for machine in solution:
+            for job in machine:
+                count[job] += 1
+                assert(count[job] <= 1)
+
+        # directly check that the sets are pairwise disjoint, slower
+        # for i in range(self.m-1):
+        #     for j in range(i+1, self.m):
+        #         assert(set.intersection(solution[i], solution[j]) == set()) # assert pair of sets i and j, for i != j, are disjoint
+
         assert(cost == max([sum([self.p[i] for i in solution[machine]]) for machine in range(self.m)])) # assert cost is consistent with objective value of solution
 
 
@@ -195,15 +212,19 @@ class solver:
         if time.time() - self.initialTime > self.allowableTime:
             return A.solution(self.m, self.p)
 
-        # print("initial approximation ratio: ", A.cost/self.lowerBound) ########## CHANGE
-
         A.search(self.m, self.p, increasingSortedOrder, rho, neighbourhood)
         A.cost = np.max(A.workload)
+
+        # get time to solution found with best cost
+        if A.cost < A.bestCost:
+            timeToBestCost = time.time() - A.initialTime
+        else:
+            timeToBestCost = A.timeToBestCost
 
         solution, cost, timeElapsed = A.solution(self.m, self.p)
 
         ############################
-        # self.verifyFeasibleSolution(solution, cost) ########## REMOVE, only used for testing
+        # self.verifyFeasibleSolution(solution, cost) ########## only used for testing
         # print(cost)
         # print(self.lowerBound)
         # approximationRatio = A.bestCost/self.lowerBound
@@ -214,16 +235,30 @@ class solver:
         # plt.plot(A.costTrajectory)
         # plt.axhline(y = self.lowerBound, color = "gold") # lower bound for global minimum
         #########################################
-        return (solution, cost, timeElapsed)
+        return (solution, cost, timeElapsed, timeToBestCost)
 
 def solveInstance(filename):
     X = solver()
     X.importInstance(filename)
     sol = X.solve(math.pow(len(X.p), -3/2), "greedy", "swap")
-    print("objective value: ", sol[1])
-    print("lower bound for optimal: ", X.lowerBound)
-    print("time elapsed: ", sol[2], "seconds")
-    # print("feasible solution: ", sol[0]) # ADD press any key for feasible solution???
+    print("Objective value: ", sol[1])
+    print("Lower bound for optimal: ", X.lowerBound)
+    print("Total time elapsed: ", sol[2], "seconds")
+    print("Time to best solution found: ", sol[3], "seconds\n")
+
+    print("Verifying feasible solution and cost...")
+    X.verifyFeasibleSolution(sol[0], sol[1]) ##################
+    print("Verified.\n") # otherwise an assertion is not met in X.verifyFeasibleSolution, which causes the program to exit
+
+    print("Feasible solution printed to file: group 5 solution.txt. Overwritten if this file already exists.\n")
+
+    # printFeasible = input("Print full feasible solution? Enter 'yes' or 'no'. Case-sensitive.\n")
+    # while not (printFeasible in ['yes', 'no']):
+    #     printFeasible = input("Print full feasible solution? Enter 'yes' or 'no'. Case-sensitive.\n")
+    # if printFeasible == 'yes':
+    #     print("Feasible solution (jobs indexed from 0 to n-1): ", sol[0])
+    # else:
+    #     pass
     return sol
 
 
